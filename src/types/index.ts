@@ -168,6 +168,7 @@ export interface GroupMealPlan {
   name: string;
   peopleCount: number;
   budget: number;
+  adjustedBudget?: number;
   totalPrice: number;
   restrictions: DietaryRestriction[];
   coldDishes: Dish[];

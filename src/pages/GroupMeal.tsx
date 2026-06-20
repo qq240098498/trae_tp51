@@ -159,6 +159,13 @@ export default function GroupMeal() {
           {plan && (
             <div className="card mt-5 p-5">
               <h3 className="mb-3 font-serif text-lg font-semibold text-ink">{plan.name}</h3>
+
+              {plan.adjustedBudget && plan.adjustedBudget > plan.budget && (
+                <div className="mb-4 rounded-lg bg-clay-50 border border-clay-100 px-3 py-2 text-xs text-clay-600">
+                  预算偏低，已按最低可搭配标准 {yuan(plan.adjustedBudget)} 生成
+                </div>
+              )}
+
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="text-muted">用餐人数</span>
@@ -175,24 +182,30 @@ export default function GroupMeal() {
                   <span className="font-medium text-ink">{yuan(plan.budget)}</span>
                 </div>
                 <div className="border-t border-ink/10 pt-2">
-                  <div className="flex justify-between">
+                  <div className="flex justify-between items-center">
                     <span className="text-muted">总计</span>
-                    <span className={`text-lg font-bold ${
-                      plan.totalPrice <= plan.budget ? "text-forest-600" : "text-clay-500"
-                    }`}>
-                      {yuan(plan.totalPrice)}
-                    </span>
+                    <div className="text-right">
+                      <span className={`text-lg font-bold ${
+                        plan.totalPrice <= (plan.adjustedBudget || plan.budget) * 1.05
+                          ? "text-forest-600"
+                          : "text-clay-500"
+                      }`}>
+                        {yuan(plan.totalPrice)}
+                      </span>
+                      {(() => {
+                        const refBudget = plan.adjustedBudget || plan.budget;
+                        const diff = plan.totalPrice - refBudget;
+                        const pct = Math.abs(diff) / refBudget * 100;
+                        return (
+                          <p className={`mt-1 text-xs ${
+                            Math.abs(diff) <= refBudget * 0.05 ? "text-forest-600" : "text-clay-500"
+                          }`}>
+                            {diff >= 0 ? `超出 ${yuan(diff)} (${pct.toFixed(1)}%)` : `节省 ${yuan(-diff)} (${pct.toFixed(1)}%)`}
+                          </p>
+                        );
+                      })()}
+                    </div>
                   </div>
-                  {plan.totalPrice <= plan.budget && (
-                    <p className="mt-1 text-right text-xs text-forest-600">
-                      节省 {yuan(plan.budget - plan.totalPrice)}
-                    </p>
-                  )}
-                  {plan.totalPrice > plan.budget && (
-                    <p className="mt-1 text-right text-xs text-clay-500">
-                      超出 {yuan(plan.totalPrice - plan.budget)}
-                    </p>
-                  )}
                 </div>
               </div>
 
