@@ -4,6 +4,7 @@ import type {
   GroupMealPlan,
   ShoppingItem,
   DietaryRestriction,
+  DishCategory,
 } from "@/types";
 import { DISHES, INGREDIENT_CATEGORIES } from "@/data/dishes";
 import { genId } from "@/lib/format";
@@ -13,6 +14,13 @@ const CATEGORY_BUDGET_RATIO = {
   hot: 0.60,
   soup: 0.12,
   staple: 0.10,
+};
+
+const SERVING_RATIO = {
+  cold: 0.6,
+  hot: 0.9,
+  soup: 1.0,
+  staple: 1.0,
 };
 
 function filterByRestrictions(dishes: Dish[], restrictions: DietaryRestriction[]): Dish[] {
@@ -27,6 +35,10 @@ function shuffle<T>(arr: T[]): T[] {
     [result[i], result[j]] = [result[j], result[i]];
   }
   return result;
+}
+
+function sumServingSize(dishes: Dish[]): number {
+  return dishes.reduce((sum, d) => sum + d.servingSize, 0);
 }
 
 export function calculateDishCounts(peopleCount: number, config?: GroupMealConfig) {
@@ -52,31 +64,91 @@ export function calculateDishCounts(peopleCount: number, config?: GroupMealConfi
   return { cold, hot, soup, staple };
 }
 
-function findBestCombination(
-  dishes: Dish[],
-  count: number,
-  targetTotal: number,
-  usedIds: Set<string> = new Set()
+function ensureServingSize(
+  selected: Dish[],
+  pool: Dish[],
+  targetServing: number,
+  maxDishes: number
 ): Dish[] {
-  const available = dishes.filter((d) => !usedIds.has(d.id));
-  if (available.length === 0) return [];
+  const result = [...selected];
+  let currentServing = sumServingSize(result);
 
-  if (count >= available.length) {
-    return shuffle(available);
+  let iterations = 0;
+  while (currentServing < targetServing && result.length < maxDishes && iterations < 20) {
+    const usedIds = new Set(result.map((d) => d.id));
+    const available = pool.filter((d) => !usedIds.has(d.id));
+
+    if (available.length === 0) break;
+
+    const deficit = targetServing - currentServing;
+    const sorted = [...available].sort((a, b) => {
+      const aDiff = Math.abs(a.servingSize - deficit);
+      const bDiff = Math.abs(b.servingSize - deficit);
+      return aDiff - bDiff;
+    });
+
+    const topCandidates = sorted.slice(0, Math.min(3, sorted.length));
+    const pick = shuffle(topCandidates)[0];
+
+    result.push(pick);
+    currentServing = sumServingSize(result);
+    iterations++;
   }
 
-  const targetAvg = targetTotal / count;
+  return result;
+}
 
-  const sorted = [...available].sort((a, b) => {
-    const diffA = Math.abs(a.price - targetAvg);
-    const diffB = Math.abs(b.price - targetAvg);
-    return diffA - diffB;
-  });
+function findBudgetFitCombination(
+  pool: Dish[],
+  count: number,
+  targetTotal: number,
+  minServing: number
+): Dish[] {
+  if (pool.length === 0) return [];
 
-  const windowSize = Math.max(count * 2, Math.min(sorted.length, count * 3));
-  const candidates = sorted.slice(0, windowSize);
-  const shuffled = shuffle(candidates);
-  return shuffled.slice(0, count);
+  const targetAvg = targetTotal / Math.max(count, 1);
+
+  let best: Dish[] = [];
+  let bestScore = Infinity;
+
+  const totalServingAvailable = sumServingSize(pool);
+  const actualMinServing = Math.min(minServing, totalServingAvailable);
+
+  for (let attempt = 0; attempt < 12; attempt++) {
+    const sortedByPrice = [...pool].sort((a, b) => {
+      const diffA = Math.abs(a.price - targetAvg);
+      const diffB = Math.abs(b.price - targetAvg);
+      return diffA - diffB;
+    });
+
+    const windowSize = Math.min(pool.length, Math.max(count * 2, count + 4));
+    const candidates = shuffle(sortedByPrice.slice(0, windowSize));
+    const selected = candidates.slice(0, count);
+
+    const withServing = ensureServingSize(selected, pool, actualMinServing, count + 5);
+
+    const total = withServing.reduce((s, d) => s + d.price, 0);
+    const serving = sumServingSize(withServing);
+
+    if (serving < actualMinServing * 0.8 && withServing.length < pool.length) continue;
+
+    const priceDiff = Math.abs(total - targetTotal);
+    const servingGap = Math.max(0, actualMinServing - serving);
+    const score = priceDiff + servingGap * 5;
+
+    if (score < bestScore) {
+      bestScore = score;
+      best = withServing;
+    }
+
+    if (priceDiff <= targetTotal * 0.08 && serving >= actualMinServing) break;
+  }
+
+  if (best.length === 0 && pool.length > 0) {
+    best = pool.slice(0, Math.min(count, pool.length));
+  }
+
+  return best;
 }
 
 function calcTotalPrice(dishes: { cold: Dish[]; hot: Dish[]; soup: Dish[]; staple: Dish[] }) {
@@ -92,73 +164,99 @@ function adjustBudget(
   selected: { cold: Dish[]; hot: Dish[]; soup: Dish[]; staple: Dish[] },
   pools: { cold: Dish[]; hot: Dish[]; soup: Dish[]; staple: Dish[] },
   targetBudget: number,
-  counts: { cold: number; hot: number; soup: number; staple: number }
+  minServingByCat: { cold: number; hot: number; soup: number; staple: number }
 ) {
   const categories: ("cold" | "hot" | "soup" | "staple")[] = ["hot", "cold", "soup", "staple"];
+  const result = { ...selected };
 
-  for (let iteration = 0; iteration < 30; iteration++) {
-    const currentTotal = calcTotalPrice(selected);
+  for (let iteration = 0; iteration < 40; iteration++) {
+    const currentTotal = calcTotalPrice(result);
     const diff = currentTotal - targetBudget;
 
     if (Math.abs(diff) <= targetBudget * 0.05) break;
 
+    let improved = false;
+
     if (diff > 0) {
       for (const cat of categories) {
-        if (selected[cat].length === 0) continue;
-        const sorted = [...selected[cat]].sort((a, b) => b.price - a.price);
+        if (result[cat].length <= 1) continue;
+
+        const catMinServing = minServingByCat[cat];
+        const sorted = [...result[cat]].sort((a, b) => b.price - a.price);
+
         for (const expensive of sorted) {
+          const others = result[cat].filter((d) => d.id !== expensive.id);
+          const othersServing = sumServingSize(others);
+          const minNeed = Math.max(0, catMinServing - othersServing);
+
           const pool = pools[cat].filter(
-            (p) => !selected[cat].some((s) => s.id === p.id) && p.price < expensive.price
+            (p) =>
+              !result[cat].some((s) => s.id === p.id) &&
+              p.price < expensive.price &&
+              p.servingSize >= minNeed
           );
+
           if (pool.length === 0) continue;
-          const cheaper = pool.sort((a, b) => {
-            const aDiff = expensive.price - a.price;
-            const bDiff = expensive.price - b.price;
-            const aOver = aDiff >= diff * 0.5 ? 0 : 1;
-            const bOver = bDiff >= diff * 0.5 ? 0 : 1;
-            if (aOver !== bOver) return aOver - bOver;
-            return Math.abs(a.price - (expensive.price - diff / counts[cat])) -
-              Math.abs(b.price - (expensive.price - diff / counts[cat]));
-          })[0];
-          if (cheaper) {
-            selected[cat] = selected[cat].map((d) => (d.id === expensive.id ? cheaper : d));
+
+          const targetPrice = expensive.price - diff / result[cat].length;
+          const candidates = pool.sort((a, b) => {
+            const aDiff = Math.abs(a.price - targetPrice);
+            const bDiff = Math.abs(b.price - targetPrice);
+            return aDiff - bDiff;
+          }).slice(0, Math.min(3, pool.length));
+
+          const pick = shuffle(candidates)[0];
+
+          if (pick) {
+            result[cat] = result[cat].map((d) => (d.id === expensive.id ? pick : d));
+            improved = true;
             break;
           }
         }
-        const newTotal = calcTotalPrice(selected);
-        if (Math.abs(newTotal - targetBudget) < Math.abs(diff)) break;
+        if (improved) break;
       }
     } else {
       const increaseNeeded = -diff;
       for (const cat of categories) {
-        if (selected[cat].length === 0) continue;
-        const sorted = [...selected[cat]].sort((a, b) => a.price - b.price);
+        if (result[cat].length === 0) continue;
+
+        const sorted = [...result[cat]].sort((a, b) => a.price - b.price);
+
         for (const cheap of sorted) {
           const pool = pools[cat].filter(
-            (p) => !selected[cat].some((s) => s.id === p.id) && p.price > cheap.price
+            (p) => !result[cat].some((s) => s.id === p.id) && p.price > cheap.price
           );
+
           if (pool.length === 0) continue;
-          const targetPrice = cheap.price + increaseNeeded / counts[cat];
-          const pricier = pool.sort((a, b) => {
-            const aDiff = a.price - cheap.price;
-            const bDiff = b.price - cheap.price;
-            const aOk = aDiff <= increaseNeeded * 1.1 ? 0 : 1;
-            const bOk = bDiff <= increaseNeeded * 1.1 ? 0 : 1;
-            if (aOk !== bOk) return aOk - bOk;
-            return Math.abs(a.price - targetPrice) - Math.abs(b.price - targetPrice);
-          })[0];
-          if (pricier) {
-            selected[cat] = selected[cat].map((d) => (d.id === cheap.id ? pricier : d));
+
+          const targetPrice = cheap.price + increaseNeeded / result[cat].length;
+          const candidates = pool
+            .filter((p) => p.price - cheap.price <= increaseNeeded * 1.2)
+            .sort((a, b) => {
+              const aDiff = Math.abs(a.price - targetPrice);
+              const bDiff = Math.abs(b.price - targetPrice);
+              return aDiff - bDiff;
+            })
+            .slice(0, Math.min(3, pool.length));
+
+          if (candidates.length === 0) continue;
+
+          const pick = shuffle(candidates)[0];
+
+          if (pick) {
+            result[cat] = result[cat].map((d) => (d.id === cheap.id ? pick : d));
+            improved = true;
             break;
           }
         }
-        const newTotal = calcTotalPrice(selected);
-        if (Math.abs(newTotal - targetBudget) < increaseNeeded) break;
+        if (improved) break;
       }
     }
+
+    if (!improved) break;
   }
 
-  return selected;
+  return result;
 }
 
 export function generateGroupMeal(config: GroupMealConfig): GroupMealPlan | null {
@@ -166,35 +264,37 @@ export function generateGroupMeal(config: GroupMealConfig): GroupMealPlan | null
 
   if (peopleCount <= 0 || budget <= 0) return null;
 
-  const counts = calculateDishCounts(peopleCount, config);
+  const allByCat: Record<DishCategory, Dish[]> = {
+    cold: filterByRestrictions(DISHES.filter((d) => d.category === "cold"), restrictions),
+    hot: filterByRestrictions(DISHES.filter((d) => d.category === "hot"), restrictions),
+    soup: filterByRestrictions(DISHES.filter((d) => d.category === "soup"), restrictions),
+    staple: filterByRestrictions(DISHES.filter((d) => d.category === "staple"), restrictions),
+  };
 
-  const allCold = filterByRestrictions(DISHES.filter((d) => d.category === "cold"), restrictions);
-  const allHot = filterByRestrictions(DISHES.filter((d) => d.category === "hot"), restrictions);
-  const allSoup = filterByRestrictions(DISHES.filter((d) => d.category === "soup"), restrictions);
-  const allStaple = filterByRestrictions(DISHES.filter((d) => d.category === "staple"), restrictions);
-
-  if (allCold.length === 0 || allHot.length === 0) {
+  if (allByCat.cold.length === 0 || allByCat.hot.length === 0) {
     return null;
   }
 
-  const minColdPrices = [...allCold].sort((a, b) => a.price - b.price).slice(0, counts.cold);
-  const minHotPrices = [...allHot].sort((a, b) => a.price - b.price).slice(0, counts.hot);
-  const minSoupPrices = [...allSoup].sort((a, b) => a.price - b.price).slice(0, counts.soup);
-  const minStaplePrices = [...allStaple].sort((a, b) => a.price - b.price).slice(0, counts.staple);
-
-  const minPossible =
-    minColdPrices.reduce((s, d) => s + d.price, 0) +
-    minHotPrices.reduce((s, d) => s + d.price, 0) +
-    minSoupPrices.reduce((s, d) => s + d.price, 0) +
-    minStaplePrices.reduce((s, d) => s + d.price, 0);
+  const minServingByCat = {
+    cold: peopleCount * SERVING_RATIO.cold,
+    hot: peopleCount * SERVING_RATIO.hot,
+    soup: peopleCount * SERVING_RATIO.soup,
+    staple: peopleCount * SERVING_RATIO.staple,
+  };
 
   let adjustedBudget = budget;
-  if (minPossible > 0 && minPossible > budget) {
+  const minPossible = calcMinBudget(allByCat, minServingByCat);
+
+  if (minPossible > budget) {
     adjustedBudget = minPossible;
   }
 
-  let bestResult: { cold: Dish[]; hot: Dish[]; soup: Dish[]; staple: Dish[] } | null = null;
-  let bestDiff = Infinity;
+  const baseCounts = calculateDishCounts(peopleCount, config);
+
+  let bestValid: { cold: Dish[]; hot: Dish[]; soup: Dish[]; staple: Dish[] } | null = null;
+  let bestValidDiff = Infinity;
+  let bestOverall: { cold: Dish[]; hot: Dish[]; soup: Dish[]; staple: Dish[] } | null = null;
+  let bestOverallScore = Infinity;
 
   for (let attempt = 0; attempt < 15; attempt++) {
     const coldTarget = adjustedBudget * CATEGORY_BUDGET_RATIO.cold;
@@ -202,13 +302,23 @@ export function generateGroupMeal(config: GroupMealConfig): GroupMealPlan | null
     const soupTarget = adjustedBudget * CATEGORY_BUDGET_RATIO.soup;
     const stapleTarget = adjustedBudget * CATEGORY_BUDGET_RATIO.staple;
 
-    const coldDishes = findBestCombination(allCold, counts.cold, coldTarget);
-    const hotDishes = findBestCombination(allHot, counts.hot, hotTarget);
-    const soupDishes = allSoup.length > 0
-      ? findBestCombination(allSoup, counts.soup, soupTarget)
+    const coldDishes = findBudgetFitCombination(
+      allByCat.cold,
+      baseCounts.cold,
+      coldTarget,
+      minServingByCat.cold
+    );
+    const hotDishes = findBudgetFitCombination(
+      allByCat.hot,
+      baseCounts.hot,
+      hotTarget,
+      minServingByCat.hot
+    );
+    const soupDishes = allByCat.soup.length > 0
+      ? findBudgetFitCombination(allByCat.soup, baseCounts.soup, soupTarget, minServingByCat.soup)
       : [];
-    const stapleDishes = allStaple.length > 0
-      ? findBestCombination(allStaple, counts.staple, stapleTarget)
+    const stapleDishes = allByCat.staple.length > 0
+      ? findBudgetFitCombination(allByCat.staple, baseCounts.staple, stapleTarget, minServingByCat.staple)
       : [];
 
     let result = {
@@ -218,22 +328,50 @@ export function generateGroupMeal(config: GroupMealConfig): GroupMealPlan | null
       staple: stapleDishes,
     };
 
-    result = adjustBudget(
-      result,
-      { cold: allCold, hot: allHot, soup: allSoup, staple: allStaple },
-      adjustedBudget,
-      counts
-    );
+    result = adjustBudget(result, allByCat, adjustedBudget, minServingByCat);
 
     const total = calcTotalPrice(result);
-    const diff = Math.abs(total - adjustedBudget);
+    const priceDiff = Math.abs(total - adjustedBudget);
 
-    if (diff < bestDiff) {
-      bestDiff = diff;
-      bestResult = result;
+    const coldServing = sumServingSize(result.cold);
+    const hotServing = sumServingSize(result.hot);
+    const soupServing = sumServingSize(result.soup);
+    const stapleServing = sumServingSize(result.staple);
+
+    const coldOk = coldServing >= minServingByCat.cold && result.cold.length > 0;
+    const hotOk = hotServing >= minServingByCat.hot && result.hot.length > 0;
+    const soupOk = allByCat.soup.length === 0 ||
+      (soupServing >= minServingByCat.soup && result.soup.length > 0);
+    const stapleOk = allByCat.staple.length === 0 ||
+      (stapleServing >= minServingByCat.staple && result.staple.length > 0);
+
+    const isValid = coldOk && hotOk && soupOk && stapleOk;
+
+    if (isValid && priceDiff < bestValidDiff) {
+      bestValidDiff = priceDiff;
+      bestValid = result;
     }
 
-    if (diff <= adjustedBudget * 0.03) break;
+    const servingGap =
+      Math.max(0, minServingByCat.cold - coldServing) +
+      Math.max(0, minServingByCat.hot - hotServing) +
+      Math.max(0, minServingByCat.soup - soupServing) +
+      Math.max(0, minServingByCat.staple - stapleServing);
+
+    const overallScore = priceDiff + servingGap * 10;
+    if (overallScore < bestOverallScore && result.cold.length > 0 && result.hot.length > 0) {
+      bestOverallScore = overallScore;
+      bestOverall = result;
+    }
+
+    if (isValid && priceDiff <= adjustedBudget * 0.04) break;
+  }
+
+  let bestResult = bestValid || bestOverall;
+
+  if (!bestResult) {
+    const fallback = buildFallbackPlan(allByCat, minServingByCat, baseCounts);
+    bestResult = fallback || null;
   }
 
   if (!bestResult) return null;
@@ -263,6 +401,79 @@ export function generateGroupMeal(config: GroupMealConfig): GroupMealPlan | null
     stapleDishes,
     shoppingList,
   };
+}
+
+function calcMinBudget(
+  pools: { cold: Dish[]; hot: Dish[]; soup: Dish[]; staple: Dish[] },
+  minServing: { cold: number; hot: number; soup: number; staple: number }
+): number {
+  function calcCategoryMin(pool: Dish[], targetServing: number): number {
+    if (pool.length === 0) return 0;
+    const sorted = [...pool].sort((a, b) => a.price / a.servingSize - b.price / b.servingSize);
+    let totalServing = 0;
+    let totalPrice = 0;
+    const used = new Set<string>();
+
+    while (totalServing < targetServing && used.size < sorted.length) {
+      const cheapest = sorted.find((d) => !used.has(d.id));
+      if (!cheapest) break;
+      used.add(cheapest.id);
+      totalPrice += cheapest.price;
+      totalServing += cheapest.servingSize;
+    }
+
+    return totalPrice;
+  }
+
+  return (
+    calcCategoryMin(pools.cold, minServing.cold) +
+    calcCategoryMin(pools.hot, minServing.hot) +
+    calcCategoryMin(pools.soup, minServing.soup) +
+    calcCategoryMin(pools.staple, minServing.staple)
+  );
+}
+
+function buildFallbackPlan(
+  pools: { cold: Dish[]; hot: Dish[]; soup: Dish[]; staple: Dish[] },
+  minServing: { cold: number; hot: number; soup: number; staple: number },
+  baseCounts: { cold: number; hot: number; soup: number; staple: number }
+): { cold: Dish[]; hot: Dish[]; soup: Dish[]; staple: Dish[] } | null {
+  function buildCategory(pool: Dish[], minCount: number, targetServing: number): Dish[] {
+    const sorted = [...pool].sort((a, b) => a.price - b.price);
+    const result: Dish[] = [];
+    const used = new Set<string>();
+
+    for (const dish of sorted) {
+      if (result.length >= minCount && sumServingSize(result) >= targetServing) break;
+      if (!used.has(dish.id)) {
+        result.push(dish);
+        used.add(dish.id);
+      }
+    }
+
+    while (sumServingSize(result) < targetServing && result.length < pool.length) {
+      const remaining = pool.filter((d) => !used.has(d.id));
+      if (remaining.length === 0) break;
+      const next = remaining.sort((a, b) => b.servingSize - a.servingSize)[0];
+      result.push(next);
+      used.add(next.id);
+    }
+
+    return result;
+  }
+
+  const cold = buildCategory(pools.cold, baseCounts.cold, minServing.cold);
+  const hot = buildCategory(pools.hot, baseCounts.hot, minServing.hot);
+  const soup = pools.soup.length > 0
+    ? buildCategory(pools.soup, Math.max(1, baseCounts.soup), minServing.soup)
+    : [];
+  const staple = pools.staple.length > 0
+    ? buildCategory(pools.staple, Math.max(1, baseCounts.staple), minServing.staple)
+    : [];
+
+  if (cold.length === 0 || hot.length === 0) return null;
+
+  return { cold, hot, soup, staple };
 }
 
 function generatePlanName(peopleCount: number, restrictions: DietaryRestriction[]): string {
@@ -330,45 +541,38 @@ export function regenerateDishes(
     staple: DISHES.filter((d) => d.category === "staple"),
   };
 
-  const available = filterByRestrictions(allByCategory[category], restrictions).filter(
+  const pool = filterByRestrictions(allByCategory[category], restrictions).filter(
     (d) => d.id !== dishId
   );
 
-  const currentDishes = {
+  const currentCategoryDishes = {
     cold: currentPlan.coldDishes,
     hot: currentPlan.hotDishes,
     soup: currentPlan.soupDishes,
     staple: currentPlan.stapleDishes,
-  };
+  }[category];
 
-  const currentCategoryDishes = currentDishes[category];
   const currentDish = currentCategoryDishes.find((d) => d.id === dishId);
 
-  if (!currentDish || available.length === 0) return currentPlan;
+  if (!currentDish || pool.length === 0) return currentPlan;
 
-  const otherDishes = [
-    ...currentPlan.coldDishes,
-    ...currentPlan.hotDishes,
-    ...currentPlan.soupDishes,
-    ...currentPlan.stapleDishes,
-  ]
-    .filter((d) => d.id !== dishId)
-    .reduce((s, d) => s + d.price, 0);
+  const otherDishes = currentCategoryDishes.filter((d) => d.id !== dishId);
+  const otherPrice = otherDishes.reduce((s, d) => s + d.price, 0);
+  const categoryBudget = currentPlan.totalPrice * CATEGORY_BUDGET_RATIO[category];
+  const targetPrice = categoryBudget - otherPrice;
 
-  const targetDishPrice = currentPlan.budget - otherDishes;
-
-  const candidates = available.filter(
+  const candidates = pool.filter(
     (d) => !currentCategoryDishes.some((cd) => cd.id === d.id)
   );
 
   if (candidates.length === 0) return currentPlan;
 
   const sorted = candidates.sort((a, b) => {
-    const diffA = Math.abs(a.price - currentDish.price);
-    const diffB = Math.abs(b.price - currentDish.price);
-    const budgetA = Math.abs(a.price - targetDishPrice);
-    const budgetB = Math.abs(b.price - targetDishPrice);
-    return (diffA + budgetA * 0.3) - (diffB + budgetB * 0.3);
+    const priceDiffA = Math.abs(a.price - targetPrice);
+    const priceDiffB = Math.abs(b.price - targetPrice);
+    const sizeDiffA = Math.abs(a.servingSize - currentDish.servingSize);
+    const sizeDiffB = Math.abs(b.servingSize - currentDish.servingSize);
+    return priceDiffA + sizeDiffA * 2 - (priceDiffB + sizeDiffB * 2);
   });
 
   const shuffled = shuffle(sorted.slice(0, Math.min(5, sorted.length)));
@@ -378,7 +582,7 @@ export function regenerateDishes(
 
   const newCategoryDishes = currentCategoryDishes.map((d) =>
     d.id === dishId ? newDish : d
-  );
+  ) as Dish[];
 
   const allDishes = [
     ...(category === "cold" ? newCategoryDishes : currentPlan.coldDishes),
@@ -392,10 +596,10 @@ export function regenerateDishes(
 
   return {
     ...currentPlan,
-    coldDishes: category === "cold" ? (newCategoryDishes as Dish[]) : currentPlan.coldDishes,
-    hotDishes: category === "hot" ? (newCategoryDishes as Dish[]) : currentPlan.hotDishes,
-    soupDishes: category === "soup" ? (newCategoryDishes as Dish[]) : currentPlan.soupDishes,
-    stapleDishes: category === "staple" ? (newCategoryDishes as Dish[]) : currentPlan.stapleDishes,
+    coldDishes: category === "cold" ? newCategoryDishes : currentPlan.coldDishes,
+    hotDishes: category === "hot" ? newCategoryDishes : currentPlan.hotDishes,
+    soupDishes: category === "soup" ? newCategoryDishes : currentPlan.soupDishes,
+    stapleDishes: category === "staple" ? newCategoryDishes : currentPlan.stapleDishes,
     totalPrice,
     shoppingList,
   };
