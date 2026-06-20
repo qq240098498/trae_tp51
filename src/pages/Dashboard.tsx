@@ -55,7 +55,7 @@ export default function Dashboard() {
       <div>
         <h1 className="font-serif text-3xl font-bold text-ink">今日山舍</h1>
         <p className="mt-1 text-sm text-muted">
-          {formatDateShort(today)} 的运营概览，今日有 {arrivals.length} 位客人入住、{pendingArrivals.length} 位待办理、{departures.length} 位待退房。
+          {formatDateShort(today)} 的运营概览，今日已入住 {arrivals.length} 位、待入住 {pendingArrivals.length} 位、待退房 {departures.length} 位。
         </p>
       </div>
 

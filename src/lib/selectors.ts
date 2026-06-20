@@ -7,7 +7,7 @@ export function arrivalsToday(bookings: Booking[]): Booking[] {
   return bookings.filter(
     (b) =>
       b.checkIn === today &&
-      (b.status === "pending" || b.status === "checked_in")
+      b.status === "checked_in"
   );
 }
 
