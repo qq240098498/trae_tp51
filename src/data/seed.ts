@@ -3,6 +3,7 @@ import type {
   BookingServiceItem,
   Holiday,
   InventoryOverride,
+  NearbyAttraction,
   RefundRule,
   Room,
   RoomType,
@@ -21,6 +22,7 @@ export interface DBShape {
   services: Service[];
   refundRules: RefundRule[];
   holidays: Holiday[];
+  nearbyAttractions: NearbyAttraction[];
 }
 
 export const DEFAULT_SERVICES: Service[] = [
@@ -37,6 +39,167 @@ export const DEFAULT_REFUND_RULES: RefundRule[] = [
   { id: "rr_1", name: "提前1-3天", daysBeforeMin: 1, daysBeforeMax: 3, refundPercent: 20, changeAllowed: false, enabled: true },
   { id: "rr_0", name: "入住前1天内", daysBeforeMin: 0, daysBeforeMax: 1, refundPercent: 0, changeAllowed: false, enabled: true },
 ];
+
+export const DEFAULT_NEARBY_ATTRACTIONS: NearbyAttraction[] = [
+  {
+    id: "attr_green_valley",
+    name: "翠竹谷风景区",
+    type: "scenic_spot",
+    description: "万亩竹海，空气清新，是徒步踏青的好去处。沿途有瀑布、溪流，适合家庭出游。",
+    address: "浙江省杭州市临安区天目山镇翠竹谷",
+    latitude: 30.3158,
+    longitude: 119.4326,
+    distance: 5.2,
+    travelTime: 15,
+    price: 68,
+    rating: 4.7,
+    season: ["春", "夏", "秋"],
+    suitablePeople: ["家庭", "情侣", "朋友"],
+    imageUrl: "https://images.unsplash.com/photo-1518495973542-4542c06a5843?w=800",
+    contactPhone: "0571-88888888",
+    enabled: true,
+    notes: "建议穿舒适的运动鞋，带好防晒用品。",
+  },
+  {
+    id: "attr_strawberry_farm",
+    name: "甜蜜草莓采摘园",
+    type: "picking",
+    description: "有机草莓种植基地，全程无公害种植。采摘体验包含免费品尝，带走按斤计价。",
+    address: "浙江省杭州市临安区太湖源镇草莓村",
+    latitude: 30.3312,
+    longitude: 119.4567,
+    distance: 8.5,
+    travelTime: 20,
+    price: 48,
+    rating: 4.8,
+    season: ["冬", "春"],
+    suitablePeople: ["家庭", "亲子", "情侣"],
+    imageUrl: "https://images.unsplash.com/photo-1464965911861-746a04b4bca6?w=800",
+    contactPhone: "13800138001",
+    enabled: true,
+    notes: "采摘入园费包含1斤草莓，超出部分30元/斤。",
+  },
+  {
+    id: "attr_grape_vineyard",
+    name: "龙泉葡萄庄园",
+    type: "picking",
+    description: "拥有200亩葡萄园，种植10余个品种的葡萄。可参观葡萄酒酿造工艺。",
+    address: "浙江省杭州市临安区於潜镇龙泉村",
+    latitude: 30.2876,
+    longitude: 119.3987,
+    distance: 12.3,
+    travelTime: 25,
+    price: 58,
+    rating: 4.6,
+    season: ["夏", "秋"],
+    suitablePeople: ["家庭", "亲子", "朋友", "团建"],
+    imageUrl: "https://images.unsplash.com/photo-1537640538966-79f369143f8f?w=800",
+    contactPhone: "13900139002",
+    enabled: true,
+    notes: "7-10月为最佳采摘期，提供免费停车。",
+  },
+  {
+    id: "attr_white_water_rafting",
+    name: "龙井峡漂流",
+    type: "rafting",
+    description: "全长3公里，落差120米，漂流时长约1.5小时。两岸风景秀丽，刺激与休闲并存。",
+    address: "浙江省杭州市临安区龙岗镇龙井村",
+    latitude: 30.2654,
+    longitude: 119.3654,
+    distance: 18.7,
+    travelTime: 35,
+    price: 168,
+    rating: 4.5,
+    season: ["夏"],
+    suitablePeople: ["情侣", "朋友", "团建", "家庭（1.4米以上）"],
+    imageUrl: "https://images.unsplash.com/photo-1501785888041-af3ef285b470?w=800",
+    contactPhone: "0571-66666666",
+    enabled: true,
+    notes: "建议携带换洗衣物，漂流鞋需另行购买。身高1.4米以下儿童谢绝参与。",
+  },
+  {
+    id: "attr_ski_resort",
+    name: "大明山滑雪场",
+    type: "skiing",
+    description: "华东地区最大的高山滑雪场，拥有初、中、高级多条雪道，配套设施完善。",
+    address: "浙江省杭州市临安区清凉峰镇大明山景区",
+    latitude: 30.1234,
+    longitude: 119.2876,
+    distance: 35.6,
+    travelTime: 55,
+    price: 298,
+    rating: 4.7,
+    season: ["冬"],
+    suitablePeople: ["家庭", "情侣", "朋友", "团建"],
+    imageUrl: "https://images.unsplash.com/photo-1551698618-1dfe5d97d256?w=800",
+    contactPhone: "0571-77777777",
+    enabled: true,
+    notes: "滑雪票包含雪板、雪鞋、雪杖，储物柜和教练费另计。建议提前3天预订。",
+  },
+  {
+    id: "attr_tea_garden",
+    name: "云雾山茶园",
+    type: "scenic_spot",
+    description: "海拔800米的高山茶园，种植西湖龙井、安吉白茶等名优茶。可体验采茶、炒茶。",
+    address: "浙江省杭州市临安区太湖源镇云雾村",
+    latitude: 30.3456,
+    longitude: 119.4789,
+    distance: 10.2,
+    travelTime: 22,
+    price: 38,
+    rating: 4.6,
+    season: ["春", "夏", "秋"],
+    suitablePeople: ["家庭", "情侣", "朋友", "老人"],
+    imageUrl: "https://images.unsplash.com/photo-1544735716-392fe2489ffa?w=800",
+    contactPhone: "13700137003",
+    enabled: true,
+    notes: "采茶体验需提前预约，春季为最佳体验期。",
+  },
+  {
+    id: "attr_peach_orchard",
+    name: "十里桃花采摘园",
+    type: "picking",
+    description: "千亩桃园，种植水蜜桃、黄桃、油桃等多个品种。春季可赏花，夏秋可采摘。",
+    address: "浙江省杭州市临安区太阳镇十里村",
+    latitude: 30.2987,
+    longitude: 119.4123,
+    distance: 15.4,
+    travelTime: 28,
+    price: 42,
+    rating: 4.5,
+    season: ["夏"],
+    suitablePeople: ["家庭", "亲子", "情侣", "朋友"],
+    imageUrl: "https://images.unsplash.com/photo-1564093497595-593b96d80180?w=800",
+    contactPhone: "13600136004",
+    enabled: true,
+    notes: "6-8月为采摘旺季，入园可免费品尝，带走按市价称重。",
+  },
+  {
+    id: "attr_canyon_rafting",
+    name: "天目大峡谷漂流",
+    type: "rafting",
+    description: "穿越原始峡谷，全程绿荫遮蔽，沿途可观奇石、飞瀑。漂流河道自然形成，惊险刺激。",
+    address: "浙江省杭州市临安区天目山镇大峡谷村",
+    latitude: 30.3210,
+    longitude: 119.3765,
+    distance: 22.8,
+    travelTime: 40,
+    price: 188,
+    rating: 4.6,
+    season: ["夏"],
+    suitablePeople: ["情侣", "朋友", "团建"],
+    imageUrl: "https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=800",
+    contactPhone: "0571-99999999",
+    enabled: true,
+    notes: "漂流会全身湿透，请备齐换洗衣物。老人和12岁以下儿童不建议参加。",
+  },
+];
+
+export const HOTEL_LOCATION = {
+  latitude: 30.3200,
+  longitude: 119.4200,
+  name: "山舍民宿",
+};
 
 export const DEFAULT_ROOM_TYPES: RoomType[] = [
   {
@@ -113,6 +276,7 @@ export function createSeedData(): DBShape {
   const refundRules = DEFAULT_REFUND_RULES.map((r) => ({ ...r }));
   const roomTypes = DEFAULT_ROOM_TYPES.map((r) => ({ ...r }));
   const rooms = buildRooms(roomTypes);
+  const nearbyAttractions = DEFAULT_NEARBY_ATTRACTIONS.map((a) => ({ ...a }));
 
   const today = todayStr();
   const holidays: Holiday[] = [
@@ -230,5 +394,5 @@ export function createSeedData(): DBShape {
     note: "客人临时有事取消，按规则退50%。", createdAtOffset: -2,
   });
 
-  return { roomTypes, rooms, inventoryOverrides: [], bookings, bookingServices, services, refundRules, holidays };
+  return { roomTypes, rooms, inventoryOverrides: [], bookings, bookingServices, services, refundRules, holidays, nearbyAttractions };
 }

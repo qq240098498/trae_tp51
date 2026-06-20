@@ -5,6 +5,7 @@ import type {
   BookingServiceItem,
   DepositStatus,
   DraftBooking,
+  NearbyAttraction,
   RefundRule,
   Room,
   RoomType,
@@ -48,6 +49,9 @@ interface StoreState extends DBShape {
   addService: (svc: Omit<Service, "id">) => void;
   updateService: (id: string, patch: Partial<Service>) => void;
   deleteService: (id: string) => void;
+  addNearbyAttraction: (attr: Omit<NearbyAttraction, "id">) => void;
+  updateNearbyAttraction: (id: string, patch: Partial<NearbyAttraction>) => void;
+  deleteNearbyAttraction: (id: string) => void;
   resetData: () => void;
 }
 
@@ -286,6 +290,13 @@ export const useStore = create<StoreState>()(
       deleteService: (id) =>
         set((s) => ({ services: s.services.filter((r) => r.id !== id) })),
 
+      addNearbyAttraction: (attr) =>
+        set((s) => ({ nearbyAttractions: [...s.nearbyAttractions, { ...attr, id: genId("attr") }] })),
+      updateNearbyAttraction: (id, patch) =>
+        set((s) => ({ nearbyAttractions: s.nearbyAttractions.map((a) => (a.id === id ? { ...a, ...patch } : a)) })),
+      deleteNearbyAttraction: (id) =>
+        set((s) => ({ nearbyAttractions: s.nearbyAttractions.filter((a) => a.id !== id) })),
+
       resetData: () => {
         const fresh = createSeedData();
         set({ ...fresh });
@@ -303,6 +314,7 @@ export const useStore = create<StoreState>()(
         services: s.services,
         refundRules: s.refundRules,
         holidays: s.holidays,
+        nearbyAttractions: s.nearbyAttractions,
       }),
     }
   )

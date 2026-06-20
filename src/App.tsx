@@ -9,6 +9,7 @@ import Frontdesk from "@/pages/Frontdesk";
 import Rules from "@/pages/Rules";
 import Services from "@/pages/Services";
 import GroupMeal from "@/pages/GroupMeal";
+import NearbyAttractions from "@/pages/NearbyAttractions";
 
 export default function App() {
   return (
@@ -25,6 +26,7 @@ export default function App() {
           <Route path="/rules" element={<Rules />} />
           <Route path="/services" element={<Services />} />
           <Route path="/group-meal" element={<GroupMeal />} />
+          <Route path="/nearby" element={<NearbyAttractions />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Layout>

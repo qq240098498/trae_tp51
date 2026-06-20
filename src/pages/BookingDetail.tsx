@@ -8,6 +8,7 @@ import {
   KeyRound,
   LogOut,
   ScrollText,
+  Map,
 } from "lucide-react";
 import { useStore } from "@/store/useStore";
 import { formatDate, todayStr, addDays, eachNight, daysBetween } from "@/lib/date";
@@ -20,6 +21,7 @@ import {
   TIER_LABEL,
   TIER_COLOR,
 } from "@/services/pricing";
+import { getRecommendations } from "@/services/nearbyRecommendation";
 import PageHeader from "@/components/ui/PageHeader";
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
@@ -29,12 +31,13 @@ import {
   DepositStatusBadge,
   RoomModeBadge,
 } from "@/components/ui/StatusBadge";
+import NearbyRecommendationCard from "@/components/booking/NearbyRecommendationCard";
 
 export default function BookingDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const {
-    bookings, roomTypes, bookingServices, services, holidays, refundRules,
+    bookings, roomTypes, bookingServices, services, holidays, refundRules, nearbyAttractions,
     cancelBooking, changeBookingDates, collectDeposit,
   } = useStore();
 
@@ -53,6 +56,11 @@ export default function BookingDetail() {
   );
   const refundPreview = booking ? calcRefund(booking.deposit, rule) : 0;
   const daysBefore = booking ? daysBetween(todayStr(), booking.checkIn) : 0;
+
+  const recommendations = useMemo(
+    () => (booking ? getRecommendations(nearbyAttractions, booking.guests, booking.checkIn, 6) : []),
+    [booking, nearbyAttractions]
+  );
 
   if (!booking || !rt) {
     return (
@@ -171,6 +179,24 @@ export default function BookingDetail() {
                     </div>
                   );
                 })}
+              </div>
+            </>
+          )}
+
+          {/* nearby recommendations */}
+          {recommendations.length > 0 && (
+            <>
+              <h4 className="mt-6 mb-3 flex items-center gap-1 font-serif text-base font-semibold text-ink">
+                <Map size={16} className="text-forest-600" />
+                周边游玩推荐
+              </h4>
+              <p className="mb-3 text-xs text-muted">
+                基于您的入住日期和{booking.guests}人出行，为您推荐以下周边景点
+              </p>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                {recommendations.map((rec) => (
+                  <NearbyRecommendationCard key={rec.attraction.id} recommendation={rec} />
+                ))}
               </div>
             </>
           )}

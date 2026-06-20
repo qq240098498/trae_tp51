@@ -195,3 +195,33 @@ export interface GroupMealConfig {
   soupCount?: number;
   stapleCount?: number;
 }
+
+export type NearbyAttractionType = "scenic_spot" | "picking" | "rafting" | "skiing";
+
+export interface NearbyAttraction {
+  id: string;
+  name: string;
+  type: NearbyAttractionType;
+  description: string;
+  address: string;
+  latitude: number;
+  longitude: number;
+  distance: number;
+  travelTime: number;
+  price: number;
+  rating: number;
+  season: string[];
+  suitablePeople: string[];
+  imageUrl: string;
+  contactPhone: string;
+  enabled: boolean;
+  notes: string;
+}
+
+export interface NearbyRecommendation {
+  attraction: NearbyAttraction;
+  distance: number;
+  travelTime: number;
+  matchScore: number;
+  reasons: string[];
+}

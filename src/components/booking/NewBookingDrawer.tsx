@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { CheckCircle2, AlertTriangle, Minus, Plus } from "lucide-react";
+import { CheckCircle2, AlertTriangle, Minus, Plus, Map } from "lucide-react";
 import type { DraftBooking } from "@/types";
 import { useStore } from "@/store/useStore";
 import { todayStr, addDays } from "@/lib/date";
@@ -11,10 +11,12 @@ import {
   TIER_LABEL,
   TIER_COLOR,
 } from "@/services/pricing";
+import { getRecommendations } from "@/services/nearbyRecommendation";
 import Drawer from "@/components/ui/Drawer";
 import Button from "@/components/ui/Button";
 import { Field, TextInput, Textarea, Select } from "@/components/ui/Field";
 import { RoomModeBadge } from "@/components/ui/StatusBadge";
+import NearbyRecommendationCard from "@/components/booking/NearbyRecommendationCard";
 
 export default function NewBookingDrawer({
   open,
@@ -24,7 +26,7 @@ export default function NewBookingDrawer({
   onClose: () => void;
 }) {
   const navigate = useNavigate();
-  const { roomTypes, services, holidays, bookings, inventoryOverrides, createBooking } = useStore();
+  const { roomTypes, services, holidays, bookings, inventoryOverrides, nearbyAttractions, createBooking } = useStore();
 
   const today = todayStr();
   const [checkIn, setCheckIn] = useState(today);
@@ -70,6 +72,11 @@ export default function NewBookingDrawer({
         ? isAvailableForRange(rt, checkIn, checkOut, bookings, undefined, inventoryOverrides)
         : { ok: false },
     [rt, checkIn, checkOut, bookings, inventoryOverrides]
+  );
+
+  const recommendations = useMemo(
+    () => getRecommendations(nearbyAttractions, draft, checkIn, 4),
+    [nearbyAttractions, draft, checkIn]
   );
 
   // default deposit = first night price (unless user edited)
@@ -207,10 +214,26 @@ export default function NewBookingDrawer({
           </div>
         </section>
 
+        {/* nearby recommendations */}
+        {recommendations.length > 0 && (
+          <section>
+            <SectionTitle index={4} title="周边推荐" />
+            <div className="mb-2 flex items-center gap-1 text-xs text-muted">
+              <Map size={12} />
+              <span>基于您的入住日期和人数，为您推荐以下周边景点</span>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              {recommendations.map((rec) => (
+                <NearbyRecommendationCard key={rec.attraction.id} recommendation={rec} />
+              ))}
+            </div>
+          </section>
+        )}
+
         {/* price breakdown */}
         {total && total.breakdown.length > 0 && (
           <section>
-            <SectionTitle index={4} title="费用明细" />
+            <SectionTitle index={5} title="费用明细" />
             <div className="overflow-hidden rounded-lg border border-ink/10">
               {total.breakdown.map((n) => (
                 <div key={n.date} className="flex items-center justify-between border-b border-ink/5 px-3 py-2 last:border-b-0">

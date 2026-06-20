@@ -10,6 +10,7 @@ import {
   UtensilsCrossed,
   ChefHat,
   Mountain,
+  MapPin,
   Plus,
   RotateCcw,
   Menu,
@@ -35,6 +36,7 @@ const NAV: NavItem[] = [
   { to: "/rules", label: "退改规则", icon: <ScrollText size={18} /> },
   { to: "/services", label: "特色服务", icon: <UtensilsCrossed size={18} /> },
   { to: "/group-meal", label: "团餐搭配", icon: <ChefHat size={18} /> },
+  { to: "/nearby", label: "周边景点", icon: <MapPin size={18} /> },
 ];
 
 function Brand() {
