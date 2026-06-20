@@ -14,6 +14,7 @@ import { todayStr, formatDateShort } from "@/lib/date";
 import { yuan } from "@/lib/format";
 import {
   arrivalsToday,
+  pendingArrivalsToday,
   departuresToday,
   inStay,
   depositHeld,
@@ -40,6 +41,7 @@ export default function Dashboard() {
   );
 
   const arrivals = arrivalsToday(bookings);
+  const pendingArrivals = pendingArrivalsToday(bookings);
   const departures = departuresToday(bookings);
   const staying = inStay(bookings);
   const avail = availabilityTotal(roomTypes, bookings, today, inventoryOverrides);
@@ -53,7 +55,7 @@ export default function Dashboard() {
       <div>
         <h1 className="font-serif text-3xl font-bold text-ink">今日山舍</h1>
         <p className="mt-1 text-sm text-muted">
-          {formatDateShort(today)} 的运营概览，今日有 {arrivals.length} 位客人待入住、{departures.length} 位待退房。
+          {formatDateShort(today)} 的运营概览，今日有 {arrivals.length} 位客人入住、{pendingArrivals.length} 位待办理、{departures.length} 位待退房。
         </p>
       </div>
 
@@ -70,7 +72,7 @@ export default function Dashboard() {
         <TodoList
           title="今日待入住"
           empty="今日没有待入住订单"
-          items={arrivals.map((b) => ({
+          items={pendingArrivals.map((b) => ({
             id: b.id,
             name: b.guestName,
             sub: roomTypeName(rtMap, b.roomTypeId),

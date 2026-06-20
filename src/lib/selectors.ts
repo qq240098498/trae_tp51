@@ -4,6 +4,15 @@ import { effectiveAvailabilityForDate, dateTier } from "@/services/pricing";
 
 export function arrivalsToday(bookings: Booking[]): Booking[] {
   const today = todayStr();
+  return bookings.filter(
+    (b) =>
+      b.checkIn === today &&
+      (b.status === "pending" || b.status === "checked_in")
+  );
+}
+
+export function pendingArrivalsToday(bookings: Booking[]): Booking[] {
+  const today = todayStr();
   return bookings.filter((b) => b.checkIn === today && b.status === "pending");
 }
 
