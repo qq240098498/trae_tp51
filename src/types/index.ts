@@ -131,3 +131,66 @@ export interface OrderTotal {
   nights: number;
   breakdown: NightBreakdown[];
 }
+
+export type DishCategory = "cold" | "hot" | "soup" | "staple";
+
+export type DietaryRestriction =
+  | "vegetarian"
+  | "vegan"
+  | "no_spicy"
+  | "no_seafood"
+  | "no_pork"
+  | "no_beef"
+  | "low_salt"
+  | "gluten_free";
+
+export interface Ingredient {
+  name: string;
+  amount: number;
+  unit: string;
+}
+
+export interface Dish {
+  id: string;
+  name: string;
+  category: DishCategory;
+  price: number;
+  description: string;
+  ingredients: Ingredient[];
+  tags: string[];
+  restrictions: DietaryRestriction[];
+  spicyLevel?: 0 | 1 | 2 | 3;
+  servingSize: number;
+}
+
+export interface GroupMealPlan {
+  id: string;
+  name: string;
+  peopleCount: number;
+  budget: number;
+  totalPrice: number;
+  restrictions: DietaryRestriction[];
+  coldDishes: Dish[];
+  hotDishes: Dish[];
+  soupDishes: Dish[];
+  stapleDishes: Dish[];
+  shoppingList: ShoppingItem[];
+}
+
+export interface ShoppingItem {
+  name: string;
+  totalAmount: number;
+  unit: string;
+  category: string;
+  notes?: string;
+}
+
+export interface GroupMealConfig {
+  peopleCount: number;
+  budget: number;
+  restrictions: DietaryRestriction[];
+  coldDishCount?: number;
+  hotDishCount?: number;
+  soupCount?: number;
+  stapleCount?: number;
+}

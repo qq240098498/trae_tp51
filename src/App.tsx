@@ -8,6 +8,7 @@ import BookingDetail from "@/pages/BookingDetail";
 import Frontdesk from "@/pages/Frontdesk";
 import Rules from "@/pages/Rules";
 import Services from "@/pages/Services";
+import GroupMeal from "@/pages/GroupMeal";
 
 export default function App() {
   return (
@@ -23,6 +24,7 @@ export default function App() {
           <Route path="/frontdesk" element={<Frontdesk />} />
           <Route path="/rules" element={<Rules />} />
           <Route path="/services" element={<Services />} />
+          <Route path="/group-meal" element={<GroupMeal />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Layout>

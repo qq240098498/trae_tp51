@@ -8,6 +8,7 @@ import {
   KeyRound,
   ScrollText,
   UtensilsCrossed,
+  ChefHat,
   Mountain,
   Plus,
   RotateCcw,
@@ -33,6 +34,7 @@ const NAV: NavItem[] = [
   { to: "/frontdesk", label: "入住退房", icon: <KeyRound size={18} /> },
   { to: "/rules", label: "退改规则", icon: <ScrollText size={18} /> },
   { to: "/services", label: "特色服务", icon: <UtensilsCrossed size={18} /> },
+  { to: "/group-meal", label: "团餐搭配", icon: <ChefHat size={18} /> },
 ];
 
 function Brand() {
